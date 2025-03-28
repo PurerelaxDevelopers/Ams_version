@@ -293,7 +293,7 @@ def run_application():
     socketio.run(app, use_reloader=False)
 
 if __name__ == "__main__":
-    threading.Thread(target=run_application, daemon=True).start()
-    # socketio.run(app, allow_unsafe_werkzeug=True, debug=True, host="0.0.0.0")
-    webview.create_window("Attendance Managements System", "http://127.0.0.1:5000", maximized=True)
-    webview.start()
+    # threading.Thread(target=run_application, daemon=True).start()
+    socketio.run(app, allow_unsafe_werkzeug=True, debug=True, host="0.0.0.0")
+    # webview.create_window("Attendance Managements System", "http://127.0.0.1:5000", maximized=True)
+    # webview.start()

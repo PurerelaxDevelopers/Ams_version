@@ -82,6 +82,7 @@ def _update_employee():
 
 
         validation = MongoDBConnection._Employee_register_validation(data, updated_check=True)
+        print(validation)
 
         if validation:
             print(validation)
@@ -280,6 +281,16 @@ def _download_the_filter_attendance_reports():
         df.to_excel(file_path, index=False)
 
         return send_file(file_path, as_attachment=True)
+    except Exception as e:
+        return {'error': str(e)}
+
+
+
+@app.route('/api/chart_data', methods=['GET'])
+def _Chart_data_for_admin():
+    try:
+        chart_data = MongoDBConnection._Chart_data_admin()
+        return jsonify(chart_data), 200
     except Exception as e:
         return {'error': str(e)}
 

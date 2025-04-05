@@ -1,10 +1,11 @@
 from pymongo import MongoClient
 from bson import ObjectId, json_util
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import uuid
 import bcrypt
 import pytz
+import traceback
 
 # Basic DB Configuration
 # mongodb_connection = MongoClient('localhost:27017')
@@ -17,6 +18,7 @@ CollectionName = db['employee_details']
 AttendanceCollection = db['attendance_tracker']
 LoginCollection = db['logindata']
 UserLoginData = db['userlogindata']
+ErrorHandling = db['errorhandling']
 
 def hash_password(password):
     salt = bcrypt.gensalt()
@@ -86,14 +88,19 @@ def _Employee_register_validation(data: dict, updated_check: bool):
             print(RFID_number, '-', existing_record.get('rfid_number'))
             print(existing_record.get('rfid_number') == RFID_number)
             if updated_check:
-                if existing_record.get('rfid_number') == RFID_number:
+                existing_record_updated = CollectionName.find_one({'$or': [
+                    {'employee_id': Employee_id},
+                    {'rfid_number': RFID_number},
+                    {'mail_id': Mail_id}
+                ], 'employee_id': Employee_id})
+                if existing_record_updated.get('rfid_number') == RFID_number:
                     return False
                 elif CollectionName.find_one({'rfid_number': RFID_number}):
                     return "RFID Number was Already Registered!..."
                 else:
                     return False
 
-                if existing_record.get('mail_id') == Mail_id:
+                if existing_record_updated.get('mail_id') == Mail_id:
                     return False
                 elif CollectionName.find_one({'mail_id': Mail_id}):
                     return "Mail ID is Already Registered!..."
@@ -152,7 +159,8 @@ def _Employee_register_list():
 def _Employee_register_delete(delete_items: str):
     try:
         result = CollectionName.delete_one({'employee_id': delete_items})
-        if result.deleted_count == 1:
+        user_login_deleted = UserLoginData.delete_one({'employee_id': delete_items})
+        if result.deleted_count and user_login_deleted.deleted_count == 1:
             return {"message": "Employee Data was Deleted!"}  # Return JSON response
         else:
             return {"error": "Employee ID not found"}
@@ -163,7 +171,13 @@ def _Employee_register_delete(delete_items: str):
 def _Employee_register_update(find_filter: dict, updated_data: dict):
     try:
         result = CollectionName.update_one(find_filter, updated_data)
-        if result.modified_count == 1:
+        data = {'$set' : {
+  "username": updated_data["$set"]['mail_id'],
+  "password": hash_password(updated_data["$set"]['phone_number']),
+  "employee_name": updated_data["$set"]['employee_name'],
+}}
+        user_login_data_updated = UserLoginData.update_one(find_filter, data)
+        if result.modified_count and user_login_data_updated.modified_count == 1:
             return {f"message": "Employee Data was Updated {result.modified_count}"}  # Return JSON response
         else:
             return {"error": "Employee ID not found"}
@@ -212,8 +226,8 @@ def _Employee_attendance(rfid_number: str):
                 late_mins = 0
 
 
-                # Apply conditions only if login is before 12 PM
-                if login_hour < 12:
+                # Apply conditions only if login is before 6 PM
+                if login_hour < 18:
                     if login_hour == 9 and login_minute >= 1:
                         remarks = "Late login"
                         late_minutes = (login_hour - 8) * 60 + login_minute
@@ -342,8 +356,8 @@ def _Employee_attendance_Employee_id(employee_id: str):
                 late_hours = 0
                 late_mins = 0
 
-                # Apply conditions only if login is before 12 PM
-                if login_hour < 12:
+                # Apply conditions only if login is before 6 PM
+                if login_hour < 18:
                     if login_hour == 9 and login_minute >= 1:
                         remarks = "Late login"
                         late_minutes = (login_hour - 8) * 60 + login_minute
@@ -804,6 +818,41 @@ def _Download_attendance_reports(download_data:dict):
 
     except Exception as e:
         return {'status': "error", "message": str(e)}
+
+
+
+
+def _Chart_data_admin():
+    try:
+        prev_date = (datetime.now() - timedelta(days=1)).strftime("%d-%m-%Y")
+
+        # Fetch data from MongoDB for the previous date
+        attendance_data = AttendanceCollection.find(
+            {"Date": prev_date},  # Filter by date
+            {"_id": 0, "Employee_Name": 1, "total_work_hrs": 1}  # Return only required fields
+        )
+        return json.loads(json_util.dumps(attendance_data))
+
+    except Exception as e:
+        # _Error_handling_(e)
+        return {'status': "error", "message": str(e)}
+
+
+
+# def _Error_handling_(e):
+#     try:
+#        Error_data = {
+#         "error_type" : type(e).__name__ ,
+#         "error_name" : e.__class__.__name__  ,
+#         "error_description" : str(e)  ,
+#         "error_traceback" : traceback.format_exc()
+#        }
+#        errorResult = ErrorHandling.insert_one(Error_data)
+#     except Exception as e:
+#         return str(e)
+
+
+
 
 
 
